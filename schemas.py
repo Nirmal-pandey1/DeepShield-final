@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
+from typing import Literal
 
 
 class UserCreate(BaseModel):
@@ -30,3 +31,12 @@ class UploadOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ImageAnalysisOut(BaseModel):
+    upload: UploadOut
+    prediction: Literal["REAL", "FAKE"]
+    confidence: float
+    real_probability: float
+    fake_probability: float
+    threat_level: Literal["SAFE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]

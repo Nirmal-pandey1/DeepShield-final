@@ -41,6 +41,7 @@ function Detect() {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [uploaded, setUploaded] = useState(false);
+  const [analysis, setAnalysis] = useState(null);
   const [urlValue, setUrlValue] = useState("");
   const [urlReady, setUrlReady] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -61,6 +62,7 @@ function Detect() {
     setFile(null);
     setPreview(null);
     setUploaded(false);
+    setAnalysis(null);
     setUrlValue("");
     setUrlReady(false);
     setError("");
@@ -83,6 +85,7 @@ function Detect() {
     setFile(selected);
     setPreview(URL.createObjectURL(selected));
     setUploaded(false);
+    setAnalysis(null);
   };
 
   const handleDrop = (event) => {
@@ -101,8 +104,10 @@ function Detect() {
     try {
       setLoading(true);
       setUploaded(false);
+      setAnalysis(null);
       setError("");
-      const response = await fetch(`${API_BASE}/upload`, {
+      const endpoint = mode === "image" ? "/analyze/image" : "/upload";
+      const response = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -120,6 +125,9 @@ function Detect() {
         if (response.status === 413) setError(`File too large. The limit is ${MAX_FILE_MB} MB.`);
         else setError(detail || "Upload failed. Please try another file.");
         return;
+      }
+      if (mode === "image") {
+        setAnalysis(await response.json());
       }
       setUploaded(true);
     } catch (requestError) {
@@ -148,6 +156,7 @@ function Detect() {
     setFile(null);
     setPreview(null);
     setUploaded(false);
+    setAnalysis(null);
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -254,7 +263,19 @@ function Detect() {
               {loading && <div className="spinner"></div>}
 
               <AnimatePresence>
-                {uploaded && (
+                {uploaded && mode === "image" && analysis && (
+                  <motion.div className="result-box upload-result" initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}>
+                    <h3 className={analysis.prediction === "REAL" ? "real" : "fake"}>
+                      {analysis.prediction === "FAKE" ? "DEEPFAKE DETECTED" : "LIKELY REAL"}
+                    </h3>
+                    <p className="confidence-label">
+                      Confidence: {Number(analysis.confidence).toFixed(1)}% · Real: {(Number(analysis.real_probability) * 100).toFixed(1)}% · Fake: {(Number(analysis.fake_probability) * 100).toFixed(1)}%
+                    </p>
+                    <p className="confidence-label">Threat level: {analysis.threat_level}</p>
+                    <motion.button className="reset-btn" onClick={handleReset} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>Choose Another File</motion.button>
+                  </motion.div>
+                )}
+                {uploaded && mode !== "image" && (
                   <motion.div className="result-box upload-result" initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}>
                     <h3 className="real">UPLOAD COMPLETE</h3>
                     <p className="confidence-label">

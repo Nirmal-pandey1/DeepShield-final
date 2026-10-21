@@ -11,6 +11,7 @@ from database import engine, Base, get_db
 import db_models
 import schemas
 from auth import hash_password, verify_password, create_access_token, get_current_user
+from image_detector import ImageModelUnavailable, InvalidImageError, predict_image
 
 logger = logging.getLogger("deepshield")
 app = FastAPI()
@@ -89,6 +90,61 @@ async def upload_file(file: UploadFile = File(...), current_user: db_models.User
         destination.unlink(missing_ok=True)
         logger.exception("Upload failed")
         raise HTTPException(status_code=500, detail="Upload failed. Please try again.")
+    finally:
+        await file.close()
+
+
+@app.post("/analyze/image", response_model=schemas.ImageAnalysisOut, status_code=status.HTTP_201_CREATED)
+async def analyze_image(file: UploadFile = File(...), current_user: db_models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    original_name = (file.filename or "upload").replace("\\", "/").rsplit("/", 1)[-1]
+    original_name = original_name[:255] or "upload"
+    extension = Path(original_name).suffix.lower()
+    if extension not in {".jpg", ".jpeg", ".png"}:
+        raise HTTPException(status_code=400, detail="Image analysis accepts JPG, JPEG, and PNG files.")
+
+    destination = None
+    try:
+        image_bytes = await file.read(MAX_FILE_SIZE + 1)
+        if len(image_bytes) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File too large (max 50MB)")
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="The uploaded image is empty.")
+
+        try:
+            prediction = predict_image(image_bytes)
+        except InvalidImageError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except ImageModelUnavailable as exc:
+            logger.exception("Image model is unavailable")
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        user_upload_dir = UPLOAD_DIR / str(current_user.id)
+        stored_name = f"{uuid.uuid4().hex}{extension}"
+        destination = user_upload_dir / stored_name
+        user_upload_dir.mkdir(parents=True, exist_ok=True)
+        with destination.open("xb") as uploaded_file:
+            uploaded_file.write(image_bytes)
+
+        upload = db_models.Upload(
+            user_id=current_user.id,
+            filename=original_name,
+            stored_name=stored_name,
+        )
+        db.add(upload)
+        db.commit()
+        db.refresh(upload)
+        return {"upload": upload, **prediction}
+    except HTTPException:
+        db.rollback()
+        if destination is not None:
+            destination.unlink(missing_ok=True)
+        raise
+    except Exception:
+        db.rollback()
+        if destination is not None:
+            destination.unlink(missing_ok=True)
+        logger.exception("Image analysis failed")
+        raise HTTPException(status_code=500, detail="Image analysis failed. Please try again.")
     finally:
         await file.close()
 

@@ -41,7 +41,7 @@ function Home() {
             MULTI-MODAL DETECTION
           </AnimatedText>
           <AnimatedText as="h1" delay={0.1}>
-            Check More Than <span className="text-gradient">Video</span>
+            Trust What You See. Verify What You<span className="text-gradient"> Click.</span>
           </AnimatedText>
           <AnimatedText as="p" delay={0.2}>
             Check an image, video, audio clip, website link or QR code from one
