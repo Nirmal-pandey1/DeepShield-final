@@ -40,3 +40,17 @@ class ImageAnalysisOut(BaseModel):
     real_probability: float
     fake_probability: float
     threat_level: Literal["SAFE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+
+
+class VideoAnalysisOut(BaseModel):
+    upload: UploadOut
+    prediction: Literal["REAL", "FAKE", "UNCERTAIN"]
+    confidence: float
+    real_probability: float
+    fake_probability: float
+    threat_level: Literal["SAFE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    model_conflict: bool
+    frames_analyzed: int
+    faces_detected: int
+    gru_temporal_score: float
+    temporal_flicker: float

@@ -106,7 +106,7 @@ function Detect() {
       setUploaded(false);
       setAnalysis(null);
       setError("");
-      const endpoint = mode === "image" ? "/analyze/image" : "/upload";
+      const endpoint = mode === "image" ? "/analyze/image" : mode === "video" ? "/analyze/video" : "/upload";
       const response = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -126,7 +126,7 @@ function Detect() {
         else setError(detail || "Upload failed. Please try another file.");
         return;
       }
-      if (mode === "image") {
+      if (mode === "image" || mode === "video") {
         setAnalysis(await response.json());
       }
       setUploaded(true);
@@ -263,19 +263,21 @@ function Detect() {
               {loading && <div className="spinner"></div>}
 
               <AnimatePresence>
-                {uploaded && mode === "image" && analysis && (
+                {uploaded && (mode === "image" || mode === "video") && analysis && (
                   <motion.div className="result-box upload-result" initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}>
-                    <h3 className={analysis.prediction === "REAL" ? "real" : "fake"}>
-                      {analysis.prediction === "FAKE" ? "DEEPFAKE DETECTED" : "LIKELY REAL"}
+                    <h3 className={analysis.prediction === "UNCERTAIN" ? undefined : analysis.prediction === "REAL" ? "real" : "fake"}>
+                      {analysis.prediction === "UNCERTAIN" ? "INCONCLUSIVE — MODELS DISAGREE" : analysis.prediction === "FAKE" ? (mode === "video" ? "DEEPFAKE VIDEO DETECTED" : "DEEPFAKE DETECTED") : (mode === "video" ? "LIKELY REAL VIDEO" : "LIKELY REAL")}
                     </h3>
                     <p className="confidence-label">
                       Confidence: {Number(analysis.confidence).toFixed(1)}% · Real: {(Number(analysis.real_probability) * 100).toFixed(1)}% · Fake: {(Number(analysis.fake_probability) * 100).toFixed(1)}%
                     </p>
                     <p className="confidence-label">Threat level: {analysis.threat_level}</p>
+                    {mode === "video" && analysis.model_conflict && <p className="confidence-label">Frame analysis leans real, while temporal analysis leans fake. Treat this result as inconclusive.</p>}
+                    {mode === "video" && <p className="confidence-label">Frames analyzed: {analysis.frames_analyzed} · Frames with faces: {analysis.faces_detected}</p>}
                     <motion.button className="reset-btn" onClick={handleReset} whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>Choose Another File</motion.button>
                   </motion.div>
                 )}
-                {uploaded && mode !== "image" && (
+                {uploaded && mode !== "image" && mode !== "video" && (
                   <motion.div className="result-box upload-result" initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}>
                     <h3 className="real">UPLOAD COMPLETE</h3>
                     <p className="confidence-label">
